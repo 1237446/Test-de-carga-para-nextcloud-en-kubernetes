@@ -1,0 +1,57 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nextcloud-user-creator
+  namespace: nextcloud-test
+spec:
+  template:
+    spec:
+      containers:
+      - name: nextcloud-job
+        image: nextcloud:stable-apache # usar la misma imagen que usa el pod de nextcloud
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            set -e
+            # Los comandos deben ser ejecutados como el usuario www-data
+            su -s /bin/bash -c "
+              # Comando 1: Generar usuarios y contraseñas
+              for i in \$(seq 1 1000); do
+                username=\"test-\$i\"
+                password=\$(head /dev/urandom | tr -dc A-Za-z0-9\$\#\%\& | head -c 16)
+                echo \"\$username,\$password\" >> /var/www/html/usuarios.txt
+              done
+              # Comando 2: Crear usuarios en Nextcloud
+              while IFS=, read -r username password; do
+                echo \"Creando usuario: \$username\"
+                export OC_PASS=\"\$password\"
+                php occ user:add \"\$username\" --password-from-env
+              done < /var/www/html/usuarios.txt
+            " www-data
+        # Volumenes usuados por nextcloud
+        volumeMounts:
+          - name: nextcloud
+            mountPath: /var/www/html
+          - name: nextcloud-data
+            mountPath: /var/www/html/data
+          - name: nextcloud-php-config
+            mountPath: /usr/local/etc/php/conf.d/nextcloud.ini
+            subPath: nextcloud.ini
+          - name: nextcloud-php-config
+            mountPath: /usr/local/etc/php/conf.d/opcache-recommended.ini
+            subPath: opcache-recommended.ini
+          - name: nextcloud-php-config
+            mountPath: /usr/local/etc/php-fpm.d/www.conf
+            subPath: www.conf
+      volumes:
+        - name: nextcloud
+          persistentVolumeClaim:
+            claimName: nextcloud
+        - name: nextcloud-data
+          persistentVolumeClaim:
+            claimName: nextcloud-data
+        - name: nextcloud-php-config
+          configMap:
+            name: nextcloud-php-config
+      restartPolicy: OnFailure
+  backoffLimit: 4
