@@ -22,7 +22,7 @@ export let options = {
   duration: '10m', // Duración total de la prueba
 };
 
-const BASE_URL = 'https://apu.uni.edu.pe'; // Reemplaza con la URL de tu instancia de Nextcloud
+const BASE_URL = 'https://domain.test.local'; // Reemplaza con la URL de tu instancia de Nextcloud
 const loginFailures = new Counter('login_failures'); // Contador para fallos de login
 
 export default function () {
