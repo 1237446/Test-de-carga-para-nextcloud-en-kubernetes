@@ -1,6 +1,68 @@
 # Test-de-carga-para-nextcloud---kubernetes
 Este test esta diseñado para simular una sesion completa en nextcloud usando las aplicaciones predeterminadas del sistema para dar una aproximacion de la capicada de nextcloud
 
+## Creacion de Usuarios
+
+### 1\. Editar el Job de create-users.yaml (yaml)
+El yaml define la cantidad de usuarios a crear ademas de los nombres y contraseñas de cada uno:
+
+```bash
+...
+      containers:
+      - name: nextcloud-job
+        image: nextcloud:stable-apache # usar la misma imagen que usa el pod de nextcloud
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            set -e
+            # ------------------------------------------
+            #  Configuracion de usuarios
+            #  Define la cantidad de usuarios a usar
+            # ------------------------------------------
+            su -s /bin/bash -c "
+              # Comando 1: Generar usuarios y contraseñas
+              for i in \$(seq 1 1000); do
+                username=\"test-\$i\"
+                password=\$(head /dev/urandom | tr -dc A-Za-z0-9\$\#\%\& | head -c 16)
+                echo \"\$username,\$password\" >> /var/www/html/usuarios.txt
+              done
+            # ------------------------------------------------------------------------------------------------
+            #  Creacion de usuarios
+            #  Crea los usuarios en nextcloud y exporta la lista en el archivo /var/www/html/usuarios.txt
+            # ------------------------------------------------------------------------------------------------
+              while IFS=, read -r username password; do
+                echo \"Creando usuario: \$username\"
+                export OC_PASS=\"\$password\"
+                php occ user:add \"\$username\" --password-from-env
+              done < /var/www/html/usuarios.txt
+            " www-data
+        # Volumenes usuados por nextcloud
+        volumeMounts:
+          - name: nextcloud
+            mountPath: /var/www/html
+...
+```
+
+### 2\. Ejecutar el Job
+
+Una vez que tengas editado el yaml **(`create-users.yaml`)**, lo ejecutas desde la línea de comandos en Linux.
+
+#### Comando Básico de Ejecución
+
+```bash
+kubectl apply -f /ruta/a/tu/script/create-users.yaml
+```
+
+### 3\. Extraccion de los usuarios y contraseñas
+
+Una vez acabado el job, ingresamos al pod de nextcloud y encontraremos un archivo llamado **`usuarios.txt`**
+
+```bash
+-rw-rw-r-- 1 www-data ww-data 25892 sep 27 16:35  usuarios.txt
+```
+
+copiamos la informacion y la guardamos en un archivo en nuestro sistema con el mismo nombre
+
 ## K6
 
 k6 es una herramienta de código abierto para pruebas de carga y rendimiento escrita en Go y diseñada para probar el rendimiento de sistemas de backend. 
@@ -88,7 +150,7 @@ Para realizar una prueba de carga con k6 solo tenemos que editar los parametros 
 
 -----
 
-## 1\. Editar el Script de test.js (JavaScript)
+### 1\. Editar el Script de test.js (JavaScript)
 
 El script de k6 define la lógica del usuario virtual: qué URLs visitar, qué datos enviar y qué esperar:
 
@@ -123,11 +185,14 @@ const loginFailures = new Counter('login_failures'); // Contador para fallos de 
 
 -----
 
-## 2\. Ejecutar la Prueba con K6
+### 2\. Ejecutar la Prueba con K6
 
-Una vez que tengas tu script (`test.js`), ejecutas k6 desde la línea de comandos en Linux.
+> [!WARNING]
+> El archivo de **`test.js`** y **`usuarios.txt`** deben estar en la misma ruta
 
-### Comando Básico de Ejecución
+Una vez que tengas tu script **(`test.js`)**, ejecutas k6 en la misma desde la línea de comandos en Linux.
+
+#### Comando Básico de Ejecución
 
 Simplemente apunta k6 a tu script de prueba:
 
@@ -137,7 +202,7 @@ k6 run /ruta/a/tu/script/test.js
 
 -----
 
-## 3\. Analizar los Resultados Clave
+### 3\. Analizar los Resultados Clave
 
 Una vez que la prueba finalice, k6 mostrará un resumen como el que viste. Los valores más importantes a monitorear son:
 
