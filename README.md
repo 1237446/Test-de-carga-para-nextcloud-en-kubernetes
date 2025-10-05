@@ -1,4 +1,4 @@
-# Test-de-carga-para-nextcloud---kubernetes
+# Test de carga para nextcloud (kubernetes)
 Este test esta diseñado para simular una sesion completa en nextcloud usando las aplicaciones predeterminadas del sistema para dar una aproximacion de la capicada de nextcloud
 
 ## Creacion de Usuarios
